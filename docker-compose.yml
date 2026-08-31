@@ -1,0 +1,49 @@
+# DATA_ROOT aponta para o diretório (fora do repo) com vídeos e features.
+# Defina em um arquivo .env na raiz — veja .env.example e docs/DATASETS.md.
+# O layout esperado abaixo de DATA_ROOT está documentado em docs/DATASETS.md.
+
+services:
+  anomaly-detection:
+    build:
+      context: models/AnomalyDetectionCVPR2018-Pytorch
+      dockerfile: Docker/Dockerfile.train
+    image: tcc/anomaly-detection:latest
+    stdin_open: true
+    tty: true
+    volumes:
+      - anomaly_ckpt:/app/AnomalyDetectionCVPR2018-Pytorch/exps
+      # rw: este é o único modelo que extrai features (feature_extractor.py)
+      - ${DATA_ROOT:?defina DATA_ROOT no .env}:/data
+
+  pel4vad:
+    build:
+      context: models/PEL4VAD
+      dockerfile: Dockerfile
+    image: tcc/pel4vad:latest
+    stdin_open: true
+    tty: true
+    environment:
+      - WANDB_MODE=disabled
+      # Sobrescreve o cfg.feat_prefix hardcoded em configs.py
+      - PEL4VAD_FEAT_PREFIX=${PEL4VAD_FEAT_PREFIX:-}
+    volumes:
+      - pel4vad_ckpt:/app/PEL4VAD/ckpt
+      - ${DATA_ROOT:?defina DATA_ROOT no .env}:/data:ro
+
+  rtfm:
+    build:
+      context: models/RTFM
+      dockerfile: Dockerfile
+    image: tcc/rtfm:latest
+    stdin_open: true
+    tty: true
+    ports:
+      - "8097:8097"
+    volumes:
+      - rtfm_ckpt:/app/RTFM/ckpt
+      - ${DATA_ROOT:?defina DATA_ROOT no .env}:/data:ro
+
+volumes:
+  anomaly_ckpt:
+  pel4vad_ckpt:
+  rtfm_ckpt:

@@ -1,0 +1,11 @@
+# Configuração local (DATA_ROOT etc.)
+.env
+
+# Teste de fumaça — deliberadamente não versionado
+Makefile.smoke
+.smoke/
+models/*/scripts/generate_dummy_features.py
+
+# Artefatos de execução
+models/AnomalyDetectionCVPR2018-Pytorch/exps/
+models/RTFM/list/local/
