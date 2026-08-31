@@ -1,37 +1,39 @@
 FROM continuumio/miniconda3
 
-# Set up working directory
 WORKDIR /app
 
-# Install sudo, git, and gdown for Google Drive downloads
-RUN apt-get update && apt-get install -y --no-install-recommends sudo git && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    pip install gdown
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        sudo \
+        wget \
+        ffmpeg \
+        pkg-config \
+        gcc \
+        g++ \
+        make \
+        libsm6 \
+        libxext6 \
+        libavformat-dev \
+        libavcodec-dev \
+        libavdevice-dev \
+        libavutil-dev \
+        libavfilter-dev \
+        libswscale-dev \
+        libswresample-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Clone the repository
-RUN git clone https://github.com/ekosman/AnomalyDetectionCVPR2018-Pytorch.git
-
-RUN conda create -n anomaly python=3.9 -y
+RUN conda create -n anomaly python=3.10 -y
 
 ENV PATH=/opt/conda/envs/anomaly/bin:$PATH
 
-# Change to the repo directory
+# Copy local source code (build context = AnomalyDetectionCVPR2018-Pytorch/)
+COPY . /app/AnomalyDetectionCVPR2018-Pytorch
+
 WORKDIR /app/AnomalyDetectionCVPR2018-Pytorch
 
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir --only-binary av -r requirements.txt
 
-# Download pretrained weights over HTTPS
-RUN mkdir -p pretrained && \
-    wget https://imagelab.ing.unimore.it/files/c3d_pytorch/c3d.pickle -O pretrained/c3d.pickle
-
-# Download example videos from Google Drive
-RUN gdown --folder --id 14sBuNXOKLa8Jos8S3VCeAgbHOCgF2-Y3 -O example_videos
-
-# Copy setup script to container
-COPY setup_anomaly.sh /app/AnomalyDetectionCVPR2018-Pytorch/setup_anomaly.sh
-
-# Make sure the setup script is executable
-RUN chmod +x /app/AnomalyDetectionCVPR2018-Pytorch/setup_anomaly.sh
+RUN chmod +x /app/AnomalyDetectionCVPR2018-Pytorch/Docker/setup_anomaly.sh
 
 # Create non-root user with sudo restricted to apt-get only
 RUN useradd -m -s /bin/bash anomalyuser && \
@@ -42,5 +44,5 @@ USER anomalyuser
 
 RUN echo "source activate anomaly" >> ~/.bashrc
 
-# Set the default command to start a bash shell
+# Pretrained weights and example_videos should be mounted via volumes (see docker-compose.yml)
 CMD ["/bin/bash"]

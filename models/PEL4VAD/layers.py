@@ -7,6 +7,8 @@ import torch.nn.functional as F
 import numpy as np
 import math
 
+from utils import DEVICE
+
 
 class DistanceAdj(nn.Module):
     def __init__(self, sigma, bias):
@@ -21,7 +23,7 @@ class DistanceAdj(nn.Module):
     def forward(self, batch_size, seq_len):
         arith = np.arange(seq_len).reshape(-1, 1)
         dist = pdist(arith, metric='cityblock').astype(np.float32)
-        dist = torch.from_numpy(squareform(dist)).cuda()
+        dist = torch.from_numpy(squareform(dist)).to(DEVICE)
         # dist = torch.exp(-self.sigma * dist ** 2)
         dist = torch.exp(-torch.abs(self.w * dist ** 2 - self.b))
         dist = torch.unsqueeze(dist, 0).repeat(batch_size, 1, 1)

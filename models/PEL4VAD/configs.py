@@ -1,4 +1,7 @@
 
+import os
+
+
 def build_config(dataset):
     cfg = type('', (), {})()
     if dataset in ['ucf', 'ucf-crime']:
@@ -79,6 +82,13 @@ def build_config(dataset):
         cfg.smooth = 'slide'  # ['fixed': 5, slide': 3]
         cfg.kappa = 3  # smooth window
         cfg.ckpt_path = './ckpt/SH__98.pkl'
+
+    # O feat_prefix acima é o caminho da máquina dos autores originais.
+    # PEL4VAD_FEAT_PREFIX (definido pelo docker-compose) aponta para o
+    # mount local das features. Ver docs/DATASETS.md na raiz do projeto.
+    feat_prefix_env = os.environ.get('PEL4VAD_FEAT_PREFIX')
+    if feat_prefix_env:
+        cfg.feat_prefix = feat_prefix_env
 
     # base settings
     cfg.feat_dim = 1024

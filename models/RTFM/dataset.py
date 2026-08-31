@@ -11,7 +11,12 @@ class Dataset(data.Dataset):
         self.modality = args.modality
         self.is_normal = is_normal
         self.dataset = args.dataset
-        if self.dataset == 'shanghai':
+        # --rgb-list / --test-rgb-list sobrescrevem o default do dataset,
+        # para apontar lists regeradas por scripts/make_lists.py.
+        override = args.test_rgb_list if test_mode else args.rgb_list
+        if override:
+            self.rgb_list_file = override
+        elif self.dataset == 'shanghai':
             if test_mode:
                 self.rgb_list_file = 'list/shanghai-i3d-test-10crop.list'
             else:

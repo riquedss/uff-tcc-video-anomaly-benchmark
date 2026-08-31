@@ -1,6 +1,6 @@
 
 import time
-from utils import fixed_smooth, slide_smooth
+from utils import fixed_smooth, slide_smooth, DEVICE
 from test import *
 
 
@@ -8,13 +8,13 @@ def infer_func(model, dataloader, gt, logger, cfg):
     st = time.time()
     with torch.no_grad():
         model.eval()
-        pred = torch.zeros(0).cuda()
-        normal_preds = torch.zeros(0).cuda()
-        normal_labels = torch.zeros(0).cuda()
-        gt_tmp = torch.tensor(gt.copy()).cuda()
+        pred = torch.zeros(0).to(DEVICE)
+        normal_preds = torch.zeros(0).to(DEVICE)
+        normal_labels = torch.zeros(0).to(DEVICE)
+        gt_tmp = torch.tensor(gt.copy()).to(DEVICE)
 
         for i, (v_input, name) in enumerate(dataloader):
-            v_input = v_input.float().cuda(non_blocking=True)
+            v_input = v_input.float().to(DEVICE, non_blocking=True)
             seq_len = torch.sum(torch.max(torch.abs(v_input), dim=2)[0] > 0, 1)
             logits, _ = model(v_input, seq_len)
             logits = torch.mean(logits, 0)

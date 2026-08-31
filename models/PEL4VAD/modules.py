@@ -3,6 +3,7 @@ import torch.nn.init as torch_init
 import torch.nn as nn
 
 from layers import *
+from utils import DEVICE
 
 
 class XEncoder(nn.Module):
@@ -35,6 +36,6 @@ class XEncoder(nn.Module):
             for k in range(w_len):
                 m[j, min(max(j - w_len // 2 + k, 0), temporal_scale - 1)] = 1.
 
-        m = m.repeat(self.n_heads, len(seq_len), 1, 1).cuda()
+        m = m.repeat(self.n_heads, len(seq_len), 1, 1).to(DEVICE)
 
         return m

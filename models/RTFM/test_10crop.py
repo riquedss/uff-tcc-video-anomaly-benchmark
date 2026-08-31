@@ -18,7 +18,10 @@ def test(dataloader, model, args, viz, device):
             sig = logits
             pred = torch.cat((pred, sig))
 
-        if args.dataset == 'shanghai':
+        # --gt sobrescreve o ground truth default do dataset.
+        if args.gt:
+            gt = np.load(args.gt)
+        elif args.dataset == 'shanghai':
             gt = np.load('list/gt-sh.npy')
         else:
             gt = np.load('list/gt-ucf.npy')

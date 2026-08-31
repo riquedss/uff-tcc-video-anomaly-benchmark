@@ -64,7 +64,7 @@ class RTFM_loss(torch.nn.Module):
         score = torch.cat((score_normal, score_abnormal), 0)
         score = score.squeeze()
 
-        label = label.cuda()
+        label = label.to(score.device)
 
         loss_cls = self.criterion(score, label)  # BCE loss in the score space
 

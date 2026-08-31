@@ -18,7 +18,6 @@ import argparse
 import copy
 
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 
 def load_checkpoint(model, ckpt_path, logger):
@@ -106,7 +105,7 @@ def main(cfg):
 
     model = XModel(cfg)
     gt = np.load(cfg.gt)
-    device = torch.device("cuda")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     param = sum(p.numel() for p in model.parameters())
@@ -132,6 +131,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='WeaklySupAnoDet')
     parser.add_argument('--dataset', default='ucf', help='anomaly video dataset')
     parser.add_argument('--mode', default='train', help='model status: (train or infer)')
+    parser.add_argument('--max-epoch', type=int, default=None, help='override cfg.max_epoch (e.g. for a quick smoke test)')
     args = parser.parse_args()
     cfg = build_config(args.dataset)
+    if args.max_epoch is not None:
+        cfg.max_epoch = args.max_epoch
     main(cfg)

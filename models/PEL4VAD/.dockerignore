@@ -1,0 +1,7 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+ckpt/
+.idea/
+log_info.log

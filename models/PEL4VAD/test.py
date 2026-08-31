@@ -1,6 +1,7 @@
 from sklearn.metrics import auc, roc_curve, confusion_matrix, precision_recall_curve
 import numpy as np
 import torch
+from utils import DEVICE
 
 
 def cal_false_alarm(gt, preds, threshold=0.5):
@@ -20,15 +21,15 @@ def cal_false_alarm(gt, preds, threshold=0.5):
 def test_func(dataloader, model, gt, dataset):
     with torch.no_grad():
         model.eval()
-        pred = torch.zeros(0).cuda()
-        abnormal_preds = torch.zeros(0).cuda()
-        abnormal_labels = torch.zeros(0).cuda()
-        normal_preds = torch.zeros(0).cuda()
-        normal_labels = torch.zeros(0).cuda()
-        gt_tmp = torch.tensor(gt.copy()).cuda()
+        pred = torch.zeros(0).to(DEVICE)
+        abnormal_preds = torch.zeros(0).to(DEVICE)
+        abnormal_labels = torch.zeros(0).to(DEVICE)
+        normal_preds = torch.zeros(0).to(DEVICE)
+        normal_labels = torch.zeros(0).to(DEVICE)
+        gt_tmp = torch.tensor(gt.copy()).to(DEVICE)
 
         for i, (v_input, label) in enumerate(dataloader):
-            v_input = v_input.float().cuda(non_blocking=True)
+            v_input = v_input.float().to(DEVICE, non_blocking=True)
             seq_len = torch.sum(torch.max(torch.abs(v_input), dim=2)[0] > 0, 1)
 
             logits, _ = model(v_input, seq_len)
