@@ -1,6 +1,9 @@
 # Configuração local (DATA_ROOT etc.)
 .env
 
+# Dataset bruto baixado localmente — não versionar (vários GB)
+data/
+
 # Teste de fumaça — deliberadamente não versionado
 Makefile.smoke
 .smoke/
