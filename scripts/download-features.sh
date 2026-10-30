@@ -54,7 +54,7 @@ download_pel4vad_sh() {
   echo "== PEL4VAD: ShanghaiTech I3D features =="
   local dir="$DATA_ROOT/shanghaitech/features"
   mkdir -p "$dir"
-  gdown --id 1kIv502RxQnMer-8HB7zrU_GU7CNPNNDv -O "$dir/SHTech-i3d.zip"
+  gdown 1kIv502RxQnMer-8HB7zrU_GU7CNPNNDv -O "$dir/SHTech-i3d.zip"
   unzip -o "$dir/SHTech-i3d.zip" -d "$dir/i3d"
   echo "Baixado em $dir/i3d -- CONFIRME a estrutura interna (train/test) antes"
   echo "de apontar PEL4VAD_FEAT_PREFIX no .env; o zip pode extrair com um"
@@ -65,7 +65,7 @@ download_anomaly_c3d() {
   echo "== AnomalyDetection: C3D features precomputadas (UCF-Crime) =="
   local dir="$DATA_ROOT/ucf-crime/features/c3d"
   mkdir -p "$dir"
-  gdown --folder --id 1rhOuAdUqyJU4hXIhToUnh5XVvYjQiN50 -O "$dir"
+  gdown --folder 1rhOuAdUqyJU4hXIhToUnh5XVvYjQiN50 -O "$dir"
 }
 
 download_anomaly_weights() {
@@ -73,8 +73,8 @@ download_anomaly_weights() {
   local dir="$DATA_ROOT/anomaly-weights"
   mkdir -p "$dir"
   wget -c -O "$dir/c3d.pickle" "http://imagelab.ing.unimore.it/files/c3d_pytorch/c3d.pickle"
-  gdown --id 1p80RJsghFIKBSLKgtRG94LE38OGY5h4y -O "$dir/r3d101.pt"
-  gdown --id 1irIdC_v7wa-sBpTiBlsMlS7BYNdj4Gr7 -O "$dir/r3d152.pt"
+  gdown 1p80RJsghFIKBSLKgtRG94LE38OGY5h4y -O "$dir/r3d101.pt"
+  gdown 1irIdC_v7wa-sBpTiBlsMlS7BYNdj4Gr7 -O "$dir/r3d152.pt"
 }
 
 case "$TARGET" in
