@@ -12,7 +12,8 @@ RUN pip install --no-cache-dir \
     "visdom" \
     "scikit-learn" \
     "matplotlib" \
-    "tqdm"
+    "tqdm" \
+    "codecarbon==2.3.4"
 
 COPY . /app/RTFM
 

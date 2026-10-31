@@ -51,6 +51,7 @@ RUN pip install --no-cache-dir \
     "tabulate==0.8.9" \
     "tqdm==4.63.0" \
     "wandb==0.12.14" \
+    "codecarbon==2.3.4" \
     "xlwt==1.3.0" \
     "yacs==0.1.8"
 
