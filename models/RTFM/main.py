@@ -10,6 +10,7 @@ import option
 from tqdm import tqdm
 from utils import Visualizer
 from config import *
+from green_metrics import GreenRun, size_mb
 
 viz = Visualizer(env='shanghai tech 10 crop', use_incoming_socket=False)
 
@@ -43,34 +44,47 @@ if __name__ == '__main__':
     test_info = {"epoch": [], "test_AUC": []}
     best_AUC = -1
     output_path = ''   # put your own path here
-    auc = test(test_loader, model, args, viz, device)
+    feature_dir = os.path.dirname(args.rgb_list) if args.rgb_list else None
+    final_ckpt = './ckpt/' + args.model_name + 'final.pkl'
 
-    for step in tqdm(
-            range(1, args.max_epoch + 1),
-            total=args.max_epoch,
-            dynamic_ncols=True
-    ):
-        if step > 1 and config.lr[step - 1] != config.lr[step - 2]:
-            for param_group in optimizer.param_groups:
-                param_group["lr"] = config.lr[step - 1]
+    best_far = 0.0
+    best_ap = 0.0
 
-        if (step - 1) % len(train_nloader) == 0:
-            loadern_iter = iter(train_nloader)
+    with GreenRun(model="rtfm", dataset=args.dataset, feature_dir=feature_dir) as run:
+        auc, far, ap = test(test_loader, model, args, viz, device)
 
-        if (step - 1) % len(train_aloader) == 0:
-            loadera_iter = iter(train_aloader)
+        for step in tqdm(
+                range(1, args.max_epoch + 1),
+                total=args.max_epoch,
+                dynamic_ncols=True
+        ):
+            if step > 1 and config.lr[step - 1] != config.lr[step - 2]:
+                for param_group in optimizer.param_groups:
+                    param_group["lr"] = config.lr[step - 1]
 
-        train(loadern_iter, loadera_iter, model, args.batch_size, optimizer, viz, device)
+            if (step - 1) % len(train_nloader) == 0:
+                loadern_iter = iter(train_nloader)
 
-        if step % 5 == 0 and step > 200:
+            if (step - 1) % len(train_aloader) == 0:
+                loadera_iter = iter(train_aloader)
 
-            auc = test(test_loader, model, args, viz, device)
-            test_info["epoch"].append(step)
-            test_info["test_AUC"].append(auc)
+            train(loadern_iter, loadera_iter, model, args.batch_size, optimizer, viz, device)
 
-            if test_info["test_AUC"][-1] > best_AUC:
-                best_AUC = test_info["test_AUC"][-1]
-                torch.save(model.state_dict(), './ckpt/' + args.model_name + '{}-i3d.pkl'.format(step))
-                save_best_record(test_info, os.path.join(output_path, '{}-step-AUC.txt'.format(step)))
-    torch.save(model.state_dict(), './ckpt/' + args.model_name + 'final.pkl')
+            if step % 5 == 0 and step > 200:
+
+                auc, far, ap = test(test_loader, model, args, viz, device)
+                test_info["epoch"].append(step)
+                test_info["test_AUC"].append(auc)
+
+                if test_info["test_AUC"][-1] > best_AUC:
+                    best_AUC = test_info["test_AUC"][-1]
+                    best_far = far
+                    best_ap = ap
+                    torch.save(model.state_dict(), './ckpt/' + args.model_name + '{}-i3d.pkl'.format(step))
+                    save_best_record(test_info, os.path.join(output_path, '{}-step-AUC.txt'.format(step)))
+        torch.save(model.state_dict(), final_ckpt)
+
+        params_m = sum(p.numel() for p in model.parameters()) / 1e6
+        run.set_metrics(auc=round(best_AUC, 4), far=round(best_far, 5), ap=round(best_ap, 4),
+                         params_m=round(params_m, 4), ckpt_mb=size_mb('./ckpt'))
 
