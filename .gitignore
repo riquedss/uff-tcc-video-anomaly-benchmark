@@ -9,6 +9,15 @@ Makefile.smoke
 .smoke/
 models/*/scripts/generate_dummy_features.py
 
+# Bytecode compilado do Python — nunca deveria ser versionado
+__pycache__/
+*.pyc
+
 # Artefatos de execução
 models/AnomalyDetectionCVPR2018-Pytorch/exps/
 models/RTFM/list/local/
+
+# CSV comparativo de métricas de custo (green_metrics.py) — gerado por run,
+# específico da máquina de treino; versionar só um snapshot quando fechar
+# os resultados do TCC.
+results/
