@@ -33,6 +33,8 @@ services:
       - WANDB_MODE=disabled
       # Sobrescreve o cfg.feat_prefix hardcoded em configs.py
       - PEL4VAD_FEAT_PREFIX=${PEL4VAD_FEAT_PREFIX:-}
+      # 0 no WSL2 (memória pinned limitada); ver configs.py
+      - PEL4VAD_PIN_MEMORY=${PEL4VAD_PIN_MEMORY:-1}
     volumes:
       - pel4vad_ckpt:/app/PEL4VAD/ckpt
       - ${DATA_ROOT:?defina DATA_ROOT no .env}:/data:ro

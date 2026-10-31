@@ -103,10 +103,10 @@ def main(cfg):
         raise RuntimeError("Do not support this dataset!")
 
     train_loader = DataLoader(train_data, batch_size=cfg.train_bs, shuffle=True,
-                              num_workers=cfg.workers, pin_memory=True)
+                              num_workers=cfg.workers, pin_memory=cfg.pin_memory)
 
     test_loader = DataLoader(test_data, batch_size=cfg.test_bs, shuffle=False,
-                             num_workers=cfg.workers, pin_memory=True)
+                             num_workers=cfg.workers, pin_memory=cfg.pin_memory)
 
     model = XModel(cfg)
     gt = np.load(cfg.gt)

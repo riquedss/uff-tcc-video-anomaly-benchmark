@@ -101,6 +101,11 @@ def build_config(dataset):
     cfg.max_seqlen = 200
     cfg.max_epoch = 50
     cfg.workers = 8
+    # pin_memory=True (default dos autores) estoura no WSL2, onde a memória
+    # pinned do CUDA é limitada ("THCCachingHostAllocator ... out of memory").
+    # PEL4VAD_PIN_MEMORY=0 desliga; não altera resultados, só a velocidade
+    # da cópia host->GPU.
+    cfg.pin_memory = os.environ.get('PEL4VAD_PIN_MEMORY', '1') != '0'
     cfg.save_dir = './ckpt/'
     cfg.logs_dir = './log_info.log'
 
