@@ -10,6 +10,9 @@ services:
     image: tcc/anomaly-detection:latest
     stdin_open: true
     tty: true
+    # Default do Docker é 64 MB de /dev/shm; os workers do DataLoader
+    # estouram isso ("Bus error ... insufficient shared memory").
+    shm_size: "8gb"
     volumes:
       - anomaly_ckpt:/app/AnomalyDetectionCVPR2018-Pytorch/exps
       # rw: este é o único modelo que extrai features (feature_extractor.py)
@@ -25,6 +28,7 @@ services:
     image: tcc/pel4vad:latest
     stdin_open: true
     tty: true
+    shm_size: "8gb"
     environment:
       - WANDB_MODE=disabled
       # Sobrescreve o cfg.feat_prefix hardcoded em configs.py
@@ -41,6 +45,7 @@ services:
     image: tcc/rtfm:latest
     stdin_open: true
     tty: true
+    shm_size: "8gb"
     ports:
       - "8097:8097"
     volumes:
