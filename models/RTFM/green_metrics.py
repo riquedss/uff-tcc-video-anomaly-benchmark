@@ -75,7 +75,11 @@ class GreenRun:
     def __exit__(self, exc_type, exc, tb):
         emissions_kg = self.tracker.stop() or 0.0
         duration_s = time.time() - self._t0
-        data = self.tracker.final_emissions_data
+        # stop() do codecarbon é decorado com @suppress(Exception): se algo
+        # falhar lá dentro ele retorna None sem setar final_emissions_data.
+        # Sem o getattr, esse AttributeError mascarava a exceção original
+        # do treino e o CSV ficava sem a linha.
+        data = getattr(self.tracker, "final_emissions_data", None)
 
         row = {
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
