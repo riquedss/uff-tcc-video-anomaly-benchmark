@@ -134,4 +134,5 @@ if __name__ == "__main__":
             save_every=args.save_every,
         )
         params_m = sum(p.numel() for p in model.get_model().parameters()) / 1e6
-        run.set_metrics(params_m=round(params_m, 4), ckpt_mb=size_mb(models_dir))
+        final_ckpt = path.join(models_dir, f"epoch_{args.epochs}.pt")
+        run.set_metrics(params_m=round(params_m, 4), ckpt_mb=size_mb(final_ckpt))
