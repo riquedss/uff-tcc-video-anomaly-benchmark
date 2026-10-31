@@ -52,10 +52,10 @@ def test_func(dataloader, model, gt, dataset):
         pr_auc = auc(rec, pre)
 
         if dataset == 'ucf-crime':
-            return roc_auc, n_far
+            return roc_auc, n_far, pr_auc
         elif dataset == 'xd-violence':
-            return pr_auc, n_far
+            return pr_auc, n_far, pr_auc
         elif dataset == 'shanghaiTech':
-            return roc_auc, n_far
+            return roc_auc, n_far, pr_auc
         else:
             raise RuntimeError('Invalid dataset.')

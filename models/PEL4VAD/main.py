@@ -14,6 +14,7 @@ from dataset import *
 from train import train_func
 from test import test_func
 from infer import infer_func
+from green_metrics import GreenRun, size_mb
 import argparse
 import copy
 
@@ -52,32 +53,36 @@ def train(model, train_loader, test_loader, gt, logger):
     logger.info('Model:{}\n'.format(model))
     logger.info('Optimizer:{}\n'.format(optimizer))
 
-    initial_auc, n_far = test_func(test_loader, model, gt, cfg.dataset)
-    logger.info('Random initialize {}:{:.4f} FAR:{:.5f}'.format(cfg.metrics, initial_auc, n_far))
+    initial_auc, n_far, initial_ap = test_func(test_loader, model, gt, cfg.dataset)
+    logger.info('Random initialize {}:{:.4f} FAR:{:.5f} AP:{:.4f}'.format(cfg.metrics, initial_auc, n_far, initial_ap))
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_auc = 0.0
     auc_far = 0.0
+    auc_ap = 0.0
 
     st = time.time()
     for epoch in range(cfg.max_epoch):
         loss1, loss2 = train_func(train_loader, model, optimizer, criterion, criterion2, cfg.lamda)
         scheduler.step()
 
-        auc, far = test_func(test_loader, model, gt, cfg.dataset)
+        auc, far, ap = test_func(test_loader, model, gt, cfg.dataset)
         if auc >= best_auc:
             best_auc = auc
             auc_far = far
+            auc_ap = ap
             best_model_wts = copy.deepcopy(model.state_dict())
 
-        logger.info('[Epoch:{}/{}]: loss1:{:.4f} loss2:{:.4f} | AUC:{:.4f} FAR:{:.5f}'.format(
-            epoch + 1, cfg.max_epoch, loss1, loss2, auc, far))
+        logger.info('[Epoch:{}/{}]: loss1:{:.4f} loss2:{:.4f} | AUC:{:.4f} FAR:{:.5f} AP:{:.4f}'.format(
+            epoch + 1, cfg.max_epoch, loss1, loss2, auc, far, ap))
 
     time_elapsed = time.time() - st
     model.load_state_dict(best_model_wts)
-    torch.save(model.state_dict(), cfg.save_dir + cfg.model_name + '_' + str(round(best_auc, 4)).split('.')[1] + '.pkl')
-    logger.info('Training completes in {:.0f}m {:.0f}s | best {}:{:.4f} FAR:{:.5f}\n'.
-                format(time_elapsed // 60, time_elapsed % 60, cfg.metrics, best_auc, auc_far))
+    ckpt_path = cfg.save_dir + cfg.model_name + '_' + str(round(best_auc, 4)).split('.')[1] + '.pkl'
+    torch.save(model.state_dict(), ckpt_path)
+    logger.info('Training completes in {:.0f}m {:.0f}s | best {}:{:.4f} FAR:{:.5f} AP:{:.4f}\n'.
+                format(time_elapsed // 60, time_elapsed % 60, cfg.metrics, best_auc, auc_far, auc_ap))
+    return best_auc, auc_far, auc_ap, ckpt_path
 
 
 def main(cfg):
@@ -113,7 +118,10 @@ def main(cfg):
 
     if args.mode == 'train':
         logger.info('Training Mode')
-        train(model, train_loader, test_loader, gt, logger)
+        with GreenRun(model="pel4vad", dataset=cfg.dataset, feature_dir=cfg.feat_prefix) as run:
+            best_auc, auc_far, auc_ap, ckpt_path = train(model, train_loader, test_loader, gt, logger)
+            run.set_metrics(auc=round(best_auc, 4), far=round(auc_far, 5), ap=round(auc_ap, 4),
+                             params_m=round(param / 1e6, 4), ckpt_mb=size_mb(ckpt_path))
 
     elif args.mode == 'infer':
         logger.info('Test Mode')
