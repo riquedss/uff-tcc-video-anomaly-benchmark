@@ -16,6 +16,7 @@ from network.anomaly_detector_model import (
 from network.TorchUtils import TorchModel, get_torch_device
 from utils.callbacks import DefaultModelCallback, TensorBoardCallback
 from utils.utils import register_logger
+from green_metrics import GreenRun, size_mb
 
 
 def get_args() -> argparse.Namespace:
@@ -117,11 +118,20 @@ if __name__ == "__main__":
     model.register_callback(TensorBoardCallback(tb_writer=tb_writer))
 
     # Training
-    model.fit(
-        train_iter=train_loader,
-        criterion=criterion,
-        optimizer=optimizer,
-        epochs=args.epochs,
-        network_model_path_base=models_dir,
-        save_every=args.save_every,
-    )
+    dataset_label = path.basename(path.normpath(args.features_path))
+    with GreenRun(
+        model="anomaly-detection",
+        dataset=dataset_label,
+        feature_dir=args.features_path,
+        notes="AUC/FAR calculados à parte via generate_ROC.py (não há eval durante o treino)",
+    ) as run:
+        model.fit(
+            train_iter=train_loader,
+            criterion=criterion,
+            optimizer=optimizer,
+            epochs=args.epochs,
+            network_model_path_base=models_dir,
+            save_every=args.save_every,
+        )
+        params_m = sum(p.numel() for p in model.get_model().parameters()) / 1e6
+        run.set_metrics(params_m=round(params_m, 4), ckpt_mb=size_mb(models_dir))

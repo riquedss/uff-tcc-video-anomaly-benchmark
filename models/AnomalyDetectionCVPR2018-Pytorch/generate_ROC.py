@@ -7,12 +7,15 @@ from os import path
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from sklearn.metrics import auc, roc_curve
+from sklearn.metrics import auc, roc_curve, precision_recall_curve
 from torch.backends import cudnn
 from tqdm import tqdm
 
 from features_loader import FeaturesLoaderVal
 from network.TorchUtils import TorchModel
+from green_metrics import CSV_PATH, FIELDS
+import csv
+import time
 
 
 def get_args() -> argparse.Namespace:
@@ -62,6 +65,7 @@ if __name__ == "__main__":
     # pylint: disable=not-callable
     y_trues = np.array([])
     y_preds = np.array([])
+    normal_preds = []  # só frames de vídeos 100% normais -- usado pro FAR
 
     with torch.no_grad():
         for features, start_end_couples, lengths in tqdm(data_iter):
@@ -91,6 +95,11 @@ if __name__ == "__main__":
                     y_trues = np.concatenate([y_trues, y_true])
                     y_preds = np.concatenate([y_preds, y_pred])
 
+                # vídeo 100% normal (nenhuma couple de anomalia) -- mesma
+                # convenção de FAR usada no PEL4VAD/RTFM (test.py/test_10crop.py)
+                if y_true.max() == 0:
+                    normal_preds.extend(list(y_pred))
+
     fpr, tpr, thresholds = roc_curve(y_true=y_trues, y_score=y_preds, pos_label=1)
 
     plt.figure()
@@ -110,3 +119,29 @@ if __name__ == "__main__":
     plt.savefig(path.join("graphs", "roc_auc.png"))
     plt.close()
     print(f"ROC curve (area = {roc_auc:0.2f})")
+
+    precision, recall, _ = precision_recall_curve(y_trues, y_preds, pos_label=1)
+    pr_auc = auc(recall, precision)
+
+    far = float((np.array(normal_preds) >= 0.5).mean()) if normal_preds else 0.0
+    print(f"AP (area = {pr_auc:0.4f}) | FAR = {far:0.5f}")
+
+    # Preenche as colunas 'auc'/'ap'/'far' no mesmo CSV comparativo usado
+    # pelo treino (green_metrics.py) -- sem tracker de energia aqui, é só
+    # avaliação.
+    os.makedirs(os.path.dirname(CSV_PATH) or ".", exist_ok=True)
+    write_header = not os.path.exists(CSV_PATH)
+    row = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "model": "anomaly-detection",
+        "dataset": path.basename(path.normpath(args.features_path)),
+        "auc": round(roc_auc, 4),
+        "ap": round(pr_auc, 4),
+        "far": round(far, 5),
+        "notes": f"eval via generate_ROC.py, ckpt={args.model_path}",
+    }
+    with open(CSV_PATH, "a", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDS)
+        if write_header:
+            writer.writeheader()
+        writer.writerow({k: row.get(k, "") for k in FIELDS})
