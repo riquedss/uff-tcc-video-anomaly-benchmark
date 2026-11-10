@@ -36,7 +36,13 @@ host_dir() {  # caminho no host de um caminho em /data
 }
 
 warm_cache() {  # lê as features uma vez para o cache de disco (protocolo: cache quente)
-    local dir; dir=$(host_dir "$1")
+    local dir size_kb avail_kb; dir=$(host_dir "$1")
+    size_kb=$(du -sk "$dir" | cut -f1)
+    avail_kb=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
+    if [ "$size_kb" -ge "$avail_kb" ]; then
+        echo "[$(date +%T)] cache não aquecido: $dir ($((size_kb / 1048576)) GB) não cabe na RAM livre ($((avail_kb / 1048576)) GB)"
+        return
+    fi
     echo "[$(date +%T)] aquecendo cache: $dir"
     find "$dir" -name '*.npy' -print0 | xargs -0 cat > /dev/null
 }
