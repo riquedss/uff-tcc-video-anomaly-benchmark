@@ -1,19 +1,27 @@
 #!/usr/bin/env bash
-# Fila dos treinos finais: 3 modelos x 2 datasets x 3 sementes, todos com as
-# features I3D 1024-d do PEL4VAD. Rodar na raiz do repo, no host (WSL2), de
-# preferência dentro de um tmux.
-#
-#   scripts/run_experiments.sh            # roda o plano padrão
-#   scripts/run_experiments.sh --smoke    # 1 treino curto de cada, CSV separado
-#   PLAN="sultani sh 0" scripts/run_experiments.sh   # só as linhas indicadas
-#
-# Cada treino grava uma linha em results/green_metrics.csv e o log em
-# results/logs/. Treinos concluídos ficam marcados em results/logs/*.done e
-# são pulados se o script for executado de novo.
+# Uso:
+#   scripts/run_experiments.sh
+#   scripts/run_experiments.sh --smoke
+#   PLAN="sultani sh 0" scripts/run_experiments.sh
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
-set -a; [ -f .env ] && . <(tr -d "\r" < .env); set +a  # .env salvo no Windows tem CRLF
+
+SESSION=treinos
+if [ -z "${TMUX:-}" ]; then
+    command -v tmux > /dev/null || { echo "instale o tmux: sudo apt install -y tmux"; exit 1; }
+    if tmux has-session -t $SESSION 2> /dev/null; then
+        echo "a fila já está rodando. Para acompanhar: tmux attach -t $SESSION"; exit 1
+    fi
+    tmux new-session -d -s $SESSION -c "$PWD" \
+        "$(printf 'PLAN=%q SEEDS=%q bash scripts/run_experiments.sh' "${PLAN:-}" "${SEEDS:-0 1 2}") $*; exec bash"
+    echo "fila iniciada na sessão tmux '$SESSION'"
+    echo "  acompanhar: tmux attach -t $SESSION   (sair sem parar: Ctrl+B e depois D)"
+    echo "  histórico:  tail -f results/logs/fila.log"
+    exit 0
+fi
+
+set -a; [ -f .env ] && . <(tr -d "\r" < .env); set +a
 
 SH_I3D=${SH_I3D:-/data/shanghaitech/features/i3d}
 UCF_I3D=${UCF_I3D:-/data/ucf-crime/features/i3d}
@@ -31,11 +39,11 @@ default_plan() {
     done
 }
 
-host_dir() {  # caminho no host de um caminho em /data
+host_dir() {
     echo "${DATA_ROOT:?defina DATA_ROOT no .env}${1#/data}"
 }
 
-warm_cache() {  # lê as features uma vez para o cache de disco (protocolo: cache quente)
+warm_cache() {
     local dir size_kb avail_kb; dir=$(host_dir "$1")
     size_kb=$(du -sk "$dir" | cut -f1)
     avail_kb=$(awk '/MemAvailable/ {print $2}' /proc/meminfo)
@@ -47,7 +55,7 @@ warm_cache() {  # lê as features uma vez para o cache de disco (protocolo: cach
     find "$dir" -name '*.npy' -print0 | xargs -0 cat > /dev/null
 }
 
-command_for() {  # model ds seed -> "servico|comando"
+command_for() {
     local model=$1 ds=$2 seed=$3 feat log
     if [ "$ds" = sh ]; then feat=$SH_I3D; else feat=$UCF_I3D; fi
     log=/results/logs/${model}_${ds}_seed${seed}
@@ -82,6 +90,7 @@ main() {
         csv_env=(-e GREEN_METRICS_CSV=/results/smoke_metrics.csv)
         LOGDIR=results/logs/smoke; mkdir -p "$LOGDIR"
     fi
+    exec > >(tee -a "$LOGDIR/fila.log") 2>&1
 
     echo "[$(date +%T)] construindo as imagens"
     $COMPOSE build anomaly-detection pel4vad rtfm || exit 1
