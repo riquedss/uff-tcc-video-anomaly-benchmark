@@ -92,7 +92,8 @@ class Dataset(data.Dataset):
         crops = [np.load(p, allow_pickle=True) for p in paths]
         if len(crops) == 1:
             return np.array(crops[0], dtype=np.float32)
-        return np.stack(crops, axis=1).astype(np.float32)
+        t = min(len(c) for c in crops)
+        return np.stack([c[:t] for c in crops], axis=1).astype(np.float32)
 
     def get_label(self):
 

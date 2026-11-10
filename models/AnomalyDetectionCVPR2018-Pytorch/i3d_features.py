@@ -24,7 +24,9 @@ def read_list(path):
 
 def load_snippets(prefix, crops):
     """[T, F]: média das features dos 10 crops."""
-    return np.mean([np.load(os.path.join(prefix, c)) for c in crops], axis=0).astype(np.float32)
+    arrays = [np.load(os.path.join(prefix, c)) for c in crops]
+    t = min(len(a) for a in arrays)
+    return np.mean([a[:t] for a in arrays], axis=0).astype(np.float32)
 
 
 def segment_bounds(n_snippets):
