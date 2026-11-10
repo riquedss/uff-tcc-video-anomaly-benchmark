@@ -17,6 +17,8 @@ services:
       - anomaly_ckpt:/app/AnomalyDetectionCVPR2018-Pytorch/exps
       # rw: este é o único modelo que extrai features (feature_extractor.py)
       - ${DATA_ROOT:?defina DATA_ROOT no .env}:/data
+      # ground truth do PEL4VAD, usado no protocolo com features I3D comuns
+      - ./models/PEL4VAD/list:/pel4vad_list:ro
       # bind mount (não volume nomeado): CSV comparativo de métricas de
       # custo (green_metrics.py) fica visível direto no host, em ./results
       - ./results:/results
@@ -53,6 +55,7 @@ services:
     volumes:
       - rtfm_ckpt:/app/RTFM/ckpt
       - ${DATA_ROOT:?defina DATA_ROOT no .env}:/data:ro
+      - ./models/PEL4VAD/list:/pel4vad_list:ro
       - ./results:/results
 
 volumes:
