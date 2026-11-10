@@ -7,7 +7,12 @@ import torch
 from torch.backends import cudnn
 from torch.utils.tensorboard import SummaryWriter
 
+import random
+
+import numpy as np
+
 from features_loader import FeaturesLoader
+from i3d_features import I3DFeaturesLoader, evaluate
 from network.anomaly_detector_model import (
     AnomalyDetector,
     RegularizedLoss,
@@ -64,6 +69,14 @@ def get_args() -> argparse.Namespace:
         "--epochs", type=int, default=2, help="number of training epochs"
     )
 
+    # Features I3D do PEL4VAD (ver i3d_features.py); sem --i3d_train_list,
+    # usa o fluxo original com features C3D em texto.
+    parser.add_argument("--i3d_train_list", type=str, default=None)
+    parser.add_argument("--i3d_test_list", type=str, default=None)
+    parser.add_argument("--i3d_gt", type=str, default=None)
+    parser.add_argument("--dataset_name", type=str, default=None, help="rótulo do dataset no CSV")
+    parser.add_argument("--seed", type=int, default=None)
+
     return parser.parse_args()
 
 
@@ -81,13 +94,25 @@ if __name__ == "__main__":
     # Optimizations
     device = get_torch_device()
     cudnn.benchmark = True  # enable cudnn tune
+    if args.seed is not None:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
 
     # Data loader
-    train_loader = FeaturesLoader(
-        features_path=args.features_path,
-        annotation_path=args.annotation_path,
-        iterations=args.iterations_per_epoch,
-    )
+    if args.i3d_train_list:
+        train_loader = I3DFeaturesLoader(
+            list_path=args.i3d_train_list,
+            prefix=args.features_path,
+            iterations=args.iterations_per_epoch,
+        )
+    else:
+        train_loader = FeaturesLoader(
+            features_path=args.features_path,
+            annotation_path=args.annotation_path,
+            iterations=args.iterations_per_epoch,
+        )
 
     feature_dim = train_loader.get_feature_dim
 
@@ -118,12 +143,16 @@ if __name__ == "__main__":
     model.register_callback(TensorBoardCallback(tb_writer=tb_writer))
 
     # Training
-    dataset_label = path.basename(path.normpath(args.features_path))
+    dataset_label = args.dataset_name or path.basename(path.normpath(args.features_path))
+    if args.i3d_train_list:
+        notes = f"features=i3d; seed={args.seed}; ckpt=last"
+    else:
+        notes = "AUC/FAR calculados à parte via generate_ROC.py (não há eval durante o treino)"
     with GreenRun(
         model="anomaly-detection",
         dataset=dataset_label,
         feature_dir=args.features_path,
-        notes="AUC/FAR calculados à parte via generate_ROC.py (não há eval durante o treino)",
+        notes=notes,
     ) as run:
         model.fit(
             train_iter=train_loader,
@@ -135,4 +164,11 @@ if __name__ == "__main__":
         )
         params_m = sum(p.numel() for p in model.get_model().parameters()) / 1e6
         final_ckpt = path.join(models_dir, f"epoch_{args.epochs}.pt")
-        run.set_metrics(params_m=round(params_m, 4), ckpt_mb=size_mb(final_ckpt))
+        metrics = {}
+        if args.i3d_test_list:
+            roc_auc, ap, far = evaluate(
+                model.get_model(), args.i3d_test_list, args.features_path, args.i3d_gt, device
+            )
+            print(f"final: auc {roc_auc:.4f} ap {ap:.4f} far {far:.5f}")
+            metrics = dict(auc=round(roc_auc, 4), ap=round(ap, 4), far=round(far, 5))
+        run.set_metrics(params_m=round(params_m, 4), ckpt_mb=size_mb(final_ckpt), **metrics)
