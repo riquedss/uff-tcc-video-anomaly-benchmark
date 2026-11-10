@@ -16,7 +16,6 @@ from test import test_func
 from infer import infer_func
 from green_metrics import GreenRun, size_mb
 import argparse
-import copy
 
 import os
 
@@ -56,10 +55,8 @@ def train(model, train_loader, test_loader, gt, logger):
     initial_auc, n_far, initial_ap = test_func(test_loader, model, gt, cfg.dataset)
     logger.info('Random initialize {}:{:.4f} FAR:{:.5f} AP:{:.4f}'.format(cfg.metrics, initial_auc, n_far, initial_ap))
 
-    best_model_wts = copy.deepcopy(model.state_dict())
-    best_auc = 0.0
-    auc_far = 0.0
-    auc_ap = 0.0
+    best_auc, best_far, best_ap, best_epoch = 0.0, 0.0, 0.0, 0
+    last_auc, last_far, last_ap = 0.0, 0.0, 0.0
 
     st = time.time()
     for epoch in range(cfg.max_epoch):
@@ -67,25 +64,25 @@ def train(model, train_loader, test_loader, gt, logger):
         scheduler.step()
 
         auc, far, ap = test_func(test_loader, model, gt, cfg.dataset)
+        last_auc, last_far, last_ap = auc, far, ap
         if auc >= best_auc:
-            best_auc = auc
-            auc_far = far
-            auc_ap = ap
-            best_model_wts = copy.deepcopy(model.state_dict())
+            best_auc, best_far, best_ap, best_epoch = auc, far, ap, epoch + 1
 
         logger.info('[Epoch:{}/{}]: loss1:{:.4f} loss2:{:.4f} | AUC:{:.4f} FAR:{:.5f} AP:{:.4f}'.format(
             epoch + 1, cfg.max_epoch, loss1, loss2, auc, far, ap))
 
     time_elapsed = time.time() - st
-    model.load_state_dict(best_model_wts)
-    ckpt_path = cfg.save_dir + cfg.model_name + '_' + str(round(best_auc, 4)).split('.')[1] + '.pkl'
+    ckpt_path = '{}{}_seed{}_last.pkl'.format(cfg.save_dir, cfg.model_name, cfg.seed)
     torch.save(model.state_dict(), ckpt_path)
-    logger.info('Training completes in {:.0f}m {:.0f}s | best {}:{:.4f} FAR:{:.5f} AP:{:.4f}\n'.
-                format(time_elapsed // 60, time_elapsed % 60, cfg.metrics, best_auc, auc_far, auc_ap))
-    return best_auc, auc_far, auc_ap, ckpt_path
+    logger.info('Training completes in {:.0f}m {:.0f}s | last {}:{:.4f} FAR:{:.5f} AP:{:.4f} | '
+                'best {}:{:.4f} (epoch {})\n'.format(time_elapsed // 60, time_elapsed % 60, cfg.metrics,
+                                                     last_auc, last_far, last_ap, cfg.metrics, best_auc, best_epoch))
+    return {'auc': last_auc, 'far': last_far, 'ap': last_ap,
+            'best_auc': best_auc, 'best_epoch': best_epoch, 'ckpt_path': ckpt_path}
 
 
 def main(cfg):
+    os.makedirs(os.path.dirname(cfg.logs_dir) or '.', exist_ok=True)
     logger = get_logger(cfg.logs_dir)
     setup_seed(cfg.seed)
     logger.info('Config:{}'.format(cfg.__dict__))
@@ -119,9 +116,11 @@ def main(cfg):
     if args.mode == 'train':
         logger.info('Training Mode')
         with GreenRun(model="pel4vad", dataset=cfg.dataset, feature_dir=cfg.feat_prefix) as run:
-            best_auc, auc_far, auc_ap, ckpt_path = train(model, train_loader, test_loader, gt, logger)
-            run.set_metrics(auc=round(best_auc, 4), far=round(auc_far, 5), ap=round(auc_ap, 4),
-                             params_m=round(param / 1e6, 4), ckpt_mb=size_mb(ckpt_path))
+            r = train(model, train_loader, test_loader, gt, logger)
+            run.notes = 'seed={}; ckpt=last; best_auc={:.4f}@ep{}; {}'.format(
+                cfg.seed, r['best_auc'], r['best_epoch'], run.notes).strip('; ')
+            run.set_metrics(auc=round(r['auc'], 4), far=round(r['far'], 5), ap=round(r['ap'], 4),
+                            params_m=round(param / 1e6, 4), ckpt_mb=size_mb(r['ckpt_path']))
 
     elif args.mode == 'infer':
         logger.info('Test Mode')
@@ -140,8 +139,14 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', default='ucf', help='anomaly video dataset')
     parser.add_argument('--mode', default='train', help='model status: (train or infer)')
     parser.add_argument('--max-epoch', type=int, default=None, help='override cfg.max_epoch (e.g. for a quick smoke test)')
+    parser.add_argument('--seed', type=int, default=None, help='override cfg.seed')
+    parser.add_argument('--log-file', default=None, help='override cfg.logs_dir')
     args = parser.parse_args()
     cfg = build_config(args.dataset)
     if args.max_epoch is not None:
         cfg.max_epoch = args.max_epoch
+    if args.seed is not None:
+        cfg.seed = args.seed
+    if args.log_file is not None:
+        cfg.logs_dir = args.log_file
     main(cfg)
