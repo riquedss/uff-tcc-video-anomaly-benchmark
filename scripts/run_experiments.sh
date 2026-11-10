@@ -105,7 +105,7 @@ main() {
         svc=${spec%%|*}; cmd=${spec#*|}
         [ $SMOKE = 1 ] && cmd=${cmd//\/results\/logs\//\/results\/logs\/smoke\/}
         echo "[$(date +%T)] início: $name"
-        if $COMPOSE run --rm -T "${csv_env[@]}" "$svc" bash -c "$cmd" > "$LOGDIR/$name.out" 2>&1; then
+        if $COMPOSE run --rm -T "${csv_env[@]}" "$svc" bash -c "$cmd" < /dev/null > "$LOGDIR/$name.out" 2>&1; then
             touch "$LOGDIR/$name.done"
             echo "[$(date +%T)] fim: $name"
         else
