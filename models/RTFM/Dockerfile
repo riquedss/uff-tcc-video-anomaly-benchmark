@@ -2,7 +2,10 @@ FROM pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Espelho brasileiro: archive/security.ubuntu.com recusavam conexão (nov/2026).
+RUN sed -i 's#http://archive.ubuntu.com#http://br.archive.ubuntu.com#g; s#http://security.ubuntu.com#http://br.archive.ubuntu.com#g' /etc/apt/sources.list \
+    && apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 update \
+    && apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=20 install -y --no-install-recommends \
         wget \
         make \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
