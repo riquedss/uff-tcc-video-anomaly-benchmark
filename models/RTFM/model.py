@@ -134,16 +134,16 @@ class Aggregate(nn.Module):
             # nn.dropout(0.7),
         )
         self.conv_4 = nn.Sequential(
-            nn.Conv1d(in_channels=2048, out_channels=512, kernel_size=1,
+            nn.Conv1d(in_channels=len_feature, out_channels=512, kernel_size=1,
                       stride=1, padding=0, bias = False),
             nn.ReLU(),
             # nn.dropout(0.7),
         )
         self.conv_5 = nn.Sequential(
-            nn.Conv1d(in_channels=2048, out_channels=2048, kernel_size=3,
+            nn.Conv1d(in_channels=2048, out_channels=len_feature, kernel_size=3,
                       stride=1, padding=1, bias=False), # should we keep the bias?
             nn.ReLU(),
-            nn.BatchNorm1d(2048),
+            nn.BatchNorm1d(len_feature),
             # nn.dropout(0.7)
         )
 
@@ -178,7 +178,7 @@ class Model(nn.Module):
         self.k_abn = self.num_segments // 10
         self.k_nor = self.num_segments // 10
 
-        self.Aggregate = Aggregate(len_feature=2048)
+        self.Aggregate = Aggregate(len_feature=n_features)
         self.fc1 = nn.Linear(n_features, 512)
         self.fc2 = nn.Linear(512, 128)
         self.fc3 = nn.Linear(128, 1)

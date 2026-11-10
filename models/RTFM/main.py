@@ -12,18 +12,36 @@ from utils import Visualizer
 from config import *
 from green_metrics import GreenRun, size_mb
 
-viz = Visualizer(env='shanghai tech 10 crop', use_incoming_socket=False)
+import random
+import numpy as np
+
+
+class _NoViz:
+    def __getattr__(self, name):
+        return lambda *a, **k: None
+
+
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+
 
 if __name__ == '__main__':
     args = option.parser.parse_args()
     config = Config(args)
+    if args.seed is not None:
+        setup_seed(args.seed)
+    viz = _NoViz() if args.no_visdom else Visualizer(env='shanghai tech 10 crop', use_incoming_socket=False)
 
     train_nloader = DataLoader(Dataset(args, test_mode=False, is_normal=True),
                                batch_size=args.batch_size, shuffle=True,
-                               num_workers=0, pin_memory=False, drop_last=True)
+                               num_workers=args.workers, pin_memory=False, drop_last=True)
     train_aloader = DataLoader(Dataset(args, test_mode=False, is_normal=False),
                                batch_size=args.batch_size, shuffle=True,
-                               num_workers=0, pin_memory=False, drop_last=True)
+                               num_workers=args.workers, pin_memory=False, drop_last=True)
     test_loader = DataLoader(Dataset(args, test_mode=True),
                               batch_size=1, shuffle=False,
                               num_workers=0, pin_memory=False)
@@ -44,8 +62,10 @@ if __name__ == '__main__':
     test_info = {"epoch": [], "test_AUC": []}
     best_AUC = -1
     output_path = ''   # put your own path here
-    feature_dir = os.path.dirname(args.rgb_list) if args.rgb_list else None
-    final_ckpt = './ckpt/' + args.model_name + 'final.pkl'
+    feature_dir = args.feat_prefix or None
+    seed_tag = 'seed{}'.format(args.seed) if args.seed is not None else 'noseed'
+    final_ckpt = './ckpt/{}_{}_{}_final.pkl'.format(args.model_name, args.dataset, seed_tag)
+    best_step = 0
 
     best_far = 0.0
     best_ap = 0.0
@@ -70,7 +90,7 @@ if __name__ == '__main__':
 
             train(loadern_iter, loadera_iter, model, args.batch_size, optimizer, viz, device)
 
-            if step % 5 == 0 and step > 200:
+            if args.eval_every > 0 and step % args.eval_every == 0 and step > 200:
 
                 auc, far, ap = test(test_loader, model, args, viz, device)
                 test_info["epoch"].append(step)
@@ -78,13 +98,21 @@ if __name__ == '__main__':
 
                 if test_info["test_AUC"][-1] > best_AUC:
                     best_AUC = test_info["test_AUC"][-1]
+                    best_step = step
                     best_far = far
                     best_ap = ap
                     torch.save(model.state_dict(), './ckpt/' + args.model_name + '{}-i3d.pkl'.format(step))
                     save_best_record(test_info, os.path.join(output_path, '{}-step-AUC.txt'.format(step)))
         torch.save(model.state_dict(), final_ckpt)
+        auc, far, ap = test(test_loader, model, args, viz, device)
+        print('final step {}: auc {:.4f} far {:.5f} ap {:.4f} | best auc {:.4f} (step {})'.format(
+            args.max_epoch, auc, far, ap, best_AUC, best_step))
 
         params_m = sum(p.numel() for p in model.parameters()) / 1e6
-        run.set_metrics(auc=round(best_AUC, 4), far=round(best_far, 5), ap=round(best_ap, 4),
-                         params_m=round(params_m, 4), ckpt_mb=size_mb('./ckpt'))
+        notes = '{}; ckpt=last; features={}d'.format(seed_tag, args.feature_size)
+        if best_step:
+            notes += '; best_auc={:.4f}@step{}'.format(best_AUC, best_step)
+        run.notes = '; '.join(filter(None, [notes, run.notes]))
+        run.set_metrics(auc=round(auc, 4), far=round(far, 5), ap=round(ap, 4),
+                        params_m=round(params_m, 4), ckpt_mb=size_mb(final_ckpt))
 

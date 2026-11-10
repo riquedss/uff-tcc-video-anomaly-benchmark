@@ -1,3 +1,4 @@
+import os
 import torch.utils.data as data
 import numpy as np
 from utils import process_feat
@@ -27,6 +28,10 @@ class Dataset(data.Dataset):
             else:
                 self.rgb_list_file = 'list/ucf-i3d.list'
 
+        self.feat_prefix = getattr(args, 'feat_prefix', '')
+        # O recorte em 32 segmentos do treino e deterministico; guardar o
+        # resultado evita reler os 10 arquivos de cada video a cada iteracao.
+        self._train_cache = {}
         self.tranform = transform
         self.test_mode = test_mode
         self._parse_list()
@@ -60,8 +65,9 @@ class Dataset(data.Dataset):
     def __getitem__(self, index):
 
         label = self.get_label()  # get video level label 0/1
-        features = np.load(self.list[index].strip('\n'), allow_pickle=True)
-        features = np.array(features, dtype=np.float32)
+        if not self.test_mode and index in self._train_cache:
+            return self._train_cache[index], label
+        features = self._load(self.list[index].strip('\n'))
 
         if self.tranform is not None:
             features = self.tranform(features)
@@ -75,8 +81,18 @@ class Dataset(data.Dataset):
                 feature = process_feat(feature, 32)  # divide a video into 32 segments
                 divided_features.append(feature)
             divided_features = np.array(divided_features, dtype=np.float32)
+            self._train_cache[index] = divided_features
 
             return divided_features, label
+
+    def _load(self, entry):
+        # Uma linha com 10 caminhos separados por virgula e um video com um
+        # arquivo por crop (formato do PEL4VAD): empilha em [T, 10, F].
+        paths = [os.path.join(self.feat_prefix, p) for p in entry.split(',')]
+        crops = [np.load(p, allow_pickle=True) for p in paths]
+        if len(crops) == 1:
+            return np.array(crops[0], dtype=np.float32)
+        return np.stack(crops, axis=1).astype(np.float32)
 
     def get_label(self):
 
