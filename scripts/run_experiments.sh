@@ -13,7 +13,7 @@
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
-set -a; [ -f .env ] && . ./.env; set +a
+set -a; [ -f .env ] && . <(tr -d "\r" < .env); set +a  # .env salvo no Windows tem CRLF
 
 SH_I3D=${SH_I3D:-/data/shanghaitech/features/i3d}
 UCF_I3D=${UCF_I3D:-/data/ucf-crime/features/i3d}
